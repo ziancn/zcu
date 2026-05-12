@@ -260,11 +260,13 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "pandas" },
+    { name = "pywin32" },
     { name = "xlwings" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "pandas", specifier = ">=3.0.2" },
+    { name = "pywin32", specifier = ">=311" },
     { name = "xlwings", specifier = ">=0.35.3" },
 ]
