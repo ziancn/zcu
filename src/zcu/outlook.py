@@ -35,22 +35,20 @@ from pathlib import Path
 
 
 # Configure logging
-from .misc import config_logging
-config_logging()
+from .log import default_log_config
+default_log_config()
 
 
-def get_olk_application():
-    return win32.gencache.EnsureDispatch("Outlook.Application")
+def get_app():
+    return win32.Dispatch("Outlook.Application")
 
-
-def get_olk_mapi_namespace():
-    olk_app = get_olk_application()
+def get_mapi_namespace():
+    olk_app = get_app()
      # MAPI means Messaging API
      # (a low-level API for accessing messaging systems, including email, calendar, contacts, etc.)
     return olk_app.GetNamespace("MAPI")
 
-
-def get_olk_all_stores():
+def get_all_stores():
     """
     Returns a dict of all backend stores configured in Outlook.
     Store here means the stored data and settings, it's a legacy MAPI concept.
@@ -59,7 +57,7 @@ def get_olk_all_stores():
               Example: {'user@example.com': store_obj, 'archive@example.com': store_obj}
     """
 
-    olk_namespace = get_olk_mapi_namespace()
+    olk_namespace = get_mapi_namespace()
     stores = {}
     
     for store in olk_namespace.Stores:
@@ -69,13 +67,12 @@ def get_olk_all_stores():
     
     return stores
 
-
-def get_olk_store(store_name: str = None):
+def get_store(store_name: str = None):
     """
     Returns a backend store configured in Outlook.
     Store here means the stored data and settings, it's a legacy MAPI concept.
     """
-    olk_namespace = get_olk_mapi_namespace()
+    olk_namespace = get_mapi_namespace()
 
     if store_name is None:
         # Get the default store (the one with the default email account)
@@ -89,57 +86,53 @@ def get_olk_store(store_name: str = None):
         
     raise ValueError(f"Store '{store_name}' not found in Outlook.")
 
-
-def get_olk_root_folder(store_name: str = None):
+def get_root_folder(store_name: str = None):
     if store_name is None:
         # Get the default store (the one with the default email account)
-        olk_namespace = get_olk_mapi_namespace()
-        default_store = olk_namespace.DefaultStore
+        namespace = get_mapi_namespace()
+        default_store = namespace.DefaultStore
         logging.info(f"Using default Store: {default_store.DisplayName}")
         return default_store.GetRootFolder()
     else:
-        store = get_olk_store(store_name)
+        store = get_store(store_name)
         return store.GetRootFolder()
 
-
-def get_olk_inbox_folder(store_name: str = None):
-    root_folder = get_olk_root_folder(store_name)
+def get_inbox(store_name: str = None):
+    root_folder = get_root_folder(store_name)
     # 6 corresponds to the Inbox folder
     return root_folder.Folders.Item(6)
 
-
-def get_olk_mailbox_folder(mailbox_name: str, store_name: str = None):
+def get_folder(*, path: str, store_name: str = None):
     """
-    Returns a mailbox folder by name. If mailbox_name contains path separators ('/'), it will be treated as a path and searched recursively.
+    Returns a mailbox folder by name. If mailbox_path contains path separators ('/'), it will be treated as a path and searched recursively.
 
     Args:
-        mailbox_name (str):
+        mailbox_path (str):
         store_name (str):
     Returns:
         mailbox_folder:
     """
-    root_folder = get_olk_root_folder(store_name)
+    root_folder = get_root_folder(store_name)
 
-    if "/" in mailbox_name:
-        path_parts = mailbox_name.split("/")
+    if "/" in path:
+        path_parts = path.split("/")
         current_folder = root_folder
         for part in path_parts:
             try:
                 current_folder = current_folder.Folders.Item(part)
             except ValueError:
-                raise ValueError(f"Mailbox folder '{part}' not found in path '{mailbox_name}'.")
-        logging.info(f"Found Mailbox Folder: {mailbox_name}")
+                raise ValueError(f"Mailbox folder '{part}' not found in path '{path}'.")
+        logging.info(f"Found Mailbox Folder: {path}")
         return current_folder
     else:
         try:
-            mailbox_folder = root_folder.Folders.Item(mailbox_name)
-            logging.info(f"Found Mailbox Folder: {mailbox_name}")
+            mailbox_folder = root_folder.Folders.Item(path)
+            logging.info(f"Found Mailbox Folder: {path}")
             return mailbox_folder
         except ValueError:
-            raise ValueError(f"Mailbox '{mailbox_name}' not found in Outlook.")
+            raise ValueError(f"Mailbox '{path}' not found in Outlook.")
 
-
-def download_attachments(mail_item, save_path: os.PathLike | str | Path):
+def save_attachments(mail_item, save_path: os.PathLike | str | Path):
     save_path = Path(save_path).resolve()
     save_path.mkdir(parents=True, exist_ok=True)
 
